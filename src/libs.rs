@@ -536,8 +536,8 @@ pub mod examples {
             }
         ").into_iter();
 
-        let mut output1 = result.next().unwrap().unwrap_u32();
-        let mut output2 = result.next().unwrap().unwrap_u32();
+        let output1 = result.next().unwrap().unwrap_u32();
+        let output2 = result.next().unwrap().unwrap_u32();
         println!("{:?}", output1[0..10].to_owned());
         println!("{:?}", output2[0..10].to_owned());
     }
