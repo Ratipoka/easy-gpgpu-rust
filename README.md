@@ -19,7 +19,7 @@
  
  recreating [`wgpu's hello-compute`](https://github.com/gfx-rs/wgpu/tree/v0.12/wgpu/examples/hello-compute) (205 sloc when writen with wgpu)
  
- ```
+ ```rust
  fn wgpu_hello_compute() {
      let mut device = Device::new();
      let v = vec![1u32, 4, 3, 295];
@@ -60,11 +60,11 @@
  ## Usage 
  
  First create a device :
- ```
+ ```rust
  let device = Device::new();
  ```
  Then create some buffers, specify if you want to get their content after the execution :
- ```
+ ```rust
  let v1 = vec![1i32, 2, 3, 4, 5, 6];
  // from a vector
  device.create_buffer_from("v1", &v1, BufferUsage::ReadOnly, false);
@@ -72,7 +72,7 @@
  device.create_buffer("output", "i32", v1.len(), BufferUsage::WriteOnly, true);
  ```
  Finaly, execute a shader :
- ```
+ ```rust
  let result = device.execute_shader_code(Dispatch::Linear(v1.len()), r"
  fn main() {
      output[index] = v1[index] * 2;

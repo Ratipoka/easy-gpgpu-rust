@@ -1,5 +1,6 @@
 [package]
 name = "easy-gpgpu"
+repository = "https://github.com/Ratipoka/easy-gpgpu-rust"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ratipoka"]
