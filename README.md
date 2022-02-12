@@ -2,13 +2,13 @@
  A high level, easy to use async gpgpu crate based on [`wgpu`](https://github.com/gfx-rs/wgpu).
  It is made for very large computations on powerful gpus
  
- Main goals :
+ ## Main goals :
  
  - make general purpose computing very simple
  - make it as easy as possible to write wgsl shaders
  - deal with binding buffers automatically
  
- Limitations :
+ ## Limitations :
  
  - only types available for buffers : bool, i32, u32, f32
  - max buffer byte_size : around 134_000_000 (~33 million i32)
