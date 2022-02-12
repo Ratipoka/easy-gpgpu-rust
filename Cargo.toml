@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Ratipoka"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+description = "A simple library for computations on the gpu."
 keywords = ["gpu", "gpgpu", "wgpu", "computations", "simple"]
 categories = ["hardware-support"]
 
