@@ -180,7 +180,7 @@ pub enum OutputVec {
     D(Vec<bool>)
 }
 impl OutputVec {
-    fn unwrap_i32(self) -> Vec<i32> {
+    pub fn unwrap_i32(self) -> Vec<i32> {
         match self {
             OutputVec::A(val) => {
                 val
@@ -190,7 +190,7 @@ impl OutputVec {
             }
         }
     }
-    fn unwrap_u32(self) -> Vec<u32> {
+    pub fn unwrap_u32(self) -> Vec<u32> {
         match self {
             OutputVec::B(val) => {
                 val
@@ -200,7 +200,7 @@ impl OutputVec {
             }
         }
     }
-    fn unwrap_f32(self) -> Vec<f32> {
+    pub fn unwrap_f32(self) -> Vec<f32> {
         match self {
             OutputVec::C(val) => {
                 val
@@ -210,7 +210,7 @@ impl OutputVec {
             }
         }
     }
-    fn unwrap_bool(self) -> Vec<bool> {
+    pub fn unwrap_bool(self) -> Vec<bool> {
         match self {
             OutputVec::D(val) => {
                 val
