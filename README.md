@@ -19,7 +19,7 @@ Limitations :
 
 recreating [`wgpu's hello-compute`](https://github.com/gfx-rs/wgpu/tree/v0.12/wgpu/examples/hello-compute) (205 sloc when writen with wgpu)
 
-```
+```rust
 use easy_gpgpu::*;
 fn wgpu_hello_compute() {
     let mut device = Device::new();
@@ -59,7 +59,7 @@ fn wgpu_hello_compute() {
 You just declare the name of the buffer and it is immediately available in the wgsl shader.
 
 ## Usage 
-```
+```rust
 //First create a device :
 use easy_gpgpu::*;
 let mut device = Device::new();
