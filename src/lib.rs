@@ -84,7 +84,7 @@
 //! 
 //! We just need to unwrap the data as a vector of i32s with `.unwrap_i32()`
 
-use std::{time::Instant, vec, collections::HashMap};
+use std::{vec, collections::HashMap};
 use wgpu::util::DeviceExt;
 use std::vec::Vec;
 use pollster::FutureExt;
