@@ -20,6 +20,7 @@
 //! recreating [`wgpu's hello-compute`](https://github.com/gfx-rs/wgpu/tree/v0.12/wgpu/examples/hello-compute) (205 sloc when writen with wgpu)
 //! 
 //! ```
+//! use easy_gpgpu::*;
 //! fn wgpu_hello_compute() {
 //!     let mut device = Device::new();
 //!     let v = vec![1u32, 4, 3, 295];
@@ -58,30 +59,26 @@
 //! You just declare the name of the buffer and it is immediately available in the wgsl shader.
 //! 
 //! ## Usage 
-//! 
-//! First create a device :
 //! ```
-//! let device = Device::new();
-//! ```
-//! Then create some buffers, specify if you want to get their content after the execution :
-//! ```
+//! //First create a device :
+//! use easy_gpgpu::*;
+//! let mut device = Device::new();
+//! // Then create some buffers, specify if you want to get their content after the execution :
 //! let v1 = vec![1i32, 2, 3, 4, 5, 6];
 //! // from a vector
 //! device.create_buffer_from("v1", &v1, BufferUsage::ReadOnly, false);
 //! // creates an empty buffer
 //! device.create_buffer("output", "i32", v1.len(), BufferUsage::WriteOnly, true);
-//! ```
-//! Finaly, execute a shader :
-//! ```
+//! // Finaly, execute a shader :
 //! let result = device.execute_shader_code(Dispatch::Linear(v1.len()), r"
 //! fn main() {
 //!     output[index] = v1[index] * 2;
 //! }").into_iter().next().unwrap().unwrap_i32();
-//! println!("{:?}", result);
+//! assert_eq!(result, vec![2i32, 4, 6, 8, 10, 12])
 //! ```
 //! The buffers are available in the shader with the name provided when created with the device.
 //! 
-//! The `index` variable is provided thanks to the use of `Dispatch::Linear`.
+//! The `index` variable is provided thanks to the use of `Dispatch::Linear` (index is a u32).
 //! 
 //! We had only specified one buffer with `is_output: true` so we get only one vector as an output.
 //! 
@@ -234,6 +231,7 @@ pub struct Device {
     adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    buffer_bindings_index: u32,
     buffers: Vec<Buffer>,
     output_buffers: Vec<wgpu::Buffer>
 }
@@ -258,6 +256,7 @@ impl  Device {
                 adapter,
                 device,
                 queue,
+                buffer_bindings_index: 0,
                 buffers: vec![],
                 output_buffers: vec![]
             }
@@ -367,7 +366,7 @@ impl  Device {
     /// 
     /// The first line of your shader should be exactly : "fn main() {", the shader will not get preprocessed correctly otherwise.
     pub fn execute_shader_code(&mut self, dispatch: Dispatch, code: &str) -> Vec<OutputVec>{
-        // this whole function is divded into 2 parts : the preprocessing of the shader and bindgroup setup and the boring part of the wgpu api
+        // this whole function is divided into 2 parts : the preprocessing of the shader and bindgroup setup and the boring part of the wgpu api
         let dispatch_linear_len;
         match dispatch {
             Dispatch::Linear(l) => {
@@ -389,7 +388,7 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {\n");
             if dispatch_linear_len < Some(65536) {
                 main_headers += "\tlet index: u32 = global_id.x;";
             }else {
-                main_headers += &format!("\tlet index: u32 = global_id.x + global_id.y * 65536u;\nif (index >= {}u) {{return;}}", dispatch_linear_len.unwrap());
+                main_headers += &format!("\tlet index: u32 = global_id.x + global_id.y * 65535u;\nif (index >= {}u) {{return;}}\n", dispatch_linear_len.unwrap());
                 
             }
         }
@@ -434,7 +433,6 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {\n");
             }
         }
 
-
         // boring api staff :
 
         let cs_module = self.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -449,7 +447,7 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {\n");
             entry_point: "main",
         });
 
-        let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
+        let bind_group_layout = compute_pipeline.get_bind_group_layout(self.buffer_bindings_index);
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -463,7 +461,11 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {\n");
             cpass.set_bind_group(0, &bind_group, &[]);
             match dispatch {
                 Dispatch::Linear(val) => {
-                    cpass.dispatch((val % 65536).try_into().unwrap(), (val as f64 / 65536f64).ceil() as u32, 1);
+                    if val < 65536 {
+                        cpass.dispatch(val as u32, 1, 1);
+                    }else {
+                        cpass.dispatch(65535, (val as f64 / 65535f64).ceil() as u32, 1);
+                    }
                 }
                 Dispatch::Custom(x, y, z) => {
                     cpass.dispatch(x, y, z);
@@ -559,7 +561,6 @@ pub fn example1() {
 pub fn example2() {
     let mut device = Device::new();
     let v = vec![1u32; 30_000_000];
-    let start = Instant::now();
     device.create_buffer_from(
         "buf",
         &v,
@@ -593,7 +594,7 @@ pub fn example2() {
     println!("{:?}", output2[0..10].to_owned());
 }
 
-/// The comparison with wgpu hello-compute : we go 205 significant lines of code to only 34
+/// The comparison with wgpu hello-compute : we go from 205 significant lines of code to only 34
 pub fn example_wgpu_hello_compute() {
     let mut device = Device::new();
     let v = vec![1u32, 4, 3, 295];
