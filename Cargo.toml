@@ -15,4 +15,4 @@ categories = ["hardware-support"]
 [dependencies]
 wgpu = "0.12"
 pollster = "0.2"
-bytemuck = { version = "1.4", features = ["derive"] }
+bytemuck = { version = "1.5", features = ["derive"] }
