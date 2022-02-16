@@ -1,19 +1,19 @@
 # Easy GPGPU
-A high level, easy to use async gpgpu crate based on [`wgpu`](https://github.com/gfx-rs/wgpu).
+A high level, easy to use gpgpu crate based on [`wgpu`](https://github.com/gfx-rs/wgpu).
 It is made for very large computations on powerful gpus
 
-Main goals :
+## Main goals :
 
 - make general purpose computing very simple
 - make it as easy as possible to write wgsl shaders
 - deal with binding buffers automatically
 
-Limitations :
+## Limitations :
 
 - only types available for buffers : bool, i32, u32, f32
 - max buffer byte_size : around 134_000_000 (~33 million i32)
-- depending on the driver, a process will be killed if it takes more than 3 seconds on the gpu
-- takes a bit of time to initiate the device (due to wgpu backends)
+  use device.apply_on_vector to be able to go up to one billion bytes (260 million i32s)
+- takes time to initiate the device for the first time (due to wgpu backends)
 
 ## Example 
 
@@ -24,8 +24,7 @@ use easy_gpgpu::*;
 fn wgpu_hello_compute() {
     let mut device = Device::new();
     let v = vec![1u32, 4, 3, 295];
-    device.create_buffer_from("inputs", &v, BufferUsage::ReadWrite, true);
-    let result = device.execute_shader_code(Dispatch::Linear(v.len()), r"
+    let result = device.apply_on_vector(v.clone(), r"
     fn collatz_iterations(n_base: u32) -> u32{
         var n: u32 = n_base;
         var i: u32 = 0u;
@@ -44,21 +43,33 @@ fn wgpu_hello_compute() {
                 n = 3u * n + 1u;
             }
             i = i + 1u;
-        }
-        return i;
     }
-
-    fn main() {
-        inputs[index] = collatz_iterations(inputs[index]);
-    }"
-    ).into_iter().next().unwrap().unwrap_u32();
+    return i;
+    }
+    collatz_iterations(element)
+    ");
     assert_eq!(result, vec![0, 2, 7, 55]);
 }
 ```
 => No binding, no annoying global_id, no need to use a low level api.
-You just declare the name of the buffer and it is immediately available in the wgsl shader.
 
-## Usage 
+You just need to write the minimum amount of wgsl shader code.
+
+## Simplest usage with .apply_on_vector
+
+```rust
+use easy_gpgpu::*;
+// create a device
+let mut device = Device::new();
+// create the vector we want to apply a computation on
+let v1 = vec![1.0f32, 2.0, 3.0];
+// the next line reads : for every element in v1, perform : element = element * 2.0
+let v1 = device.apply_on_vector(v1, "element * 2.0");
+println!("{v1:?}");
+```
+
+## Usage with .execute_shader_code
+
 ```rust
 //First create a device :
 use easy_gpgpu::*;
@@ -84,11 +95,53 @@ We had only specified one buffer with `is_output: true` so we get only one vecto
 
 We just need to unwrap the data as a vector of i32s with `.unwrap_i32()`
 
-# More Examples
+## More Examples
 
-An example with multiple returned buffer
+The simplest method to use
 ```rust
-pub fn example2() {
+pub fn simplest_apply() {
+    let mut device = Device::new();
+    let v1 = vec![1.0f32, 2.0, 3.0];
+    // the next line reads : for every element in v1, perform : element = element * 2.0
+    let v1 = device.apply_on_vector(v1, "element * 2.0");
+    println!("{v1:?}");
+}
+```
+
+An example of device.apply_on_vector with a previously created buffer
+
+```rust
+pub fn apply_with_buf() {
+    let mut device = Device::new();
+    let v1 = vec![2.0f32, 3.0, 5.0, 7.0, 11.0];
+    let exponent = vec![3.0];
+    device.create_buffer_from("exponent", &exponent, BufferUsage::ReadOnly, false);
+    let cubes = device.apply_on_vector(v1, "pow(element, exponent[0u])");
+    println!("{cubes:?}")
+}
+```
+
+The simplest example with device.execute_shader_code : multiplying by 2 every element of a vector.
+
+```rust
+pub fn simplest_execute_shader() {
+    let mut device = Device::new();
+    let v1 = vec![1i32, 2, 3, 4, 5, 6];
+    device.create_buffer_from("v1", &v1, BufferUsage::ReadOnly, false);
+    device.create_buffer("output", BufferType::I32, v1.len(), BufferUsage::WriteOnly, true);
+    let result = device.execute_shader_code(Dispatch::Linear(v1.len()), r"
+    fn main() {
+        output[index] = v1[index] * 2;
+    }
+    ").into_iter().next().unwrap().unwrap_i32();
+    assert_eq!(result, vec![2, 4, 6, 8, 10, 12]);
+}
+```
+
+An example with multiple returned buffer with device.execute_shader_code
+
+```rust
+pub fn multiple_returned_buffers() {
     let mut device = Device::new();
     let v = vec![1u32, 2, 3];
     let v2 = vec![3u32, 4, 5];
@@ -130,7 +183,7 @@ pub fn example2() {
 An Example with a custom dispatch that gives access to the global_id variable.
 
 ```rust
-pub fn example_global_id() {
+pub fn global_id() {
     let mut device = Device::new();
     let vec = vec![2u32, 3, 5, 7, 11, 13, 17];
     // "vec" is actually a reserved keyword in wgsl.
@@ -146,11 +199,31 @@ pub fn example_global_id() {
 }
 ```
 
+An example with a complete pipeline which as you can see, is quite annoying just to multiply a vector by 2.
+
+```rust
+pub fn complete_pipeline() {
+    let mut device = Device::new();
+    let v1 = vec![1u32, 2, 3, 4, 5];
+    device.create_buffer_from("v1", &v1, BufferUsage::ReadWrite, true);
+    let shader_module = device.create_shader_module(Dispatch::Linear(v1.len()), "
+    fn main() {
+        v1[index] = v1[index] * 2u;
+    }
+    ");
+    let mut commands = vec![];
+    commands.push(Command::Shader(shader_module));
+    commands.push(Command::Retrieve("v1"));
+    device.execute_commands(commands);
+    let result = device.get_buffer_data(vec!["v1"]).into_iter().next().unwrap().unwrap_u32();
+    assert_eq!(result, vec![2u32, 4, 6, 8, 10]);
+}
+```
+
 An example where we execute two shaders on the same device, with the same buffers.
 
 ```rust
 pub fn reusing_device() {
-    // example 1
     let mut device = Device::new();
     let v1 = vec![1i32, 2, 3, 4, 5, 6];
     device.create_buffer_from("v1", &v1, BufferUsage::ReadOnly, false);
@@ -171,49 +244,11 @@ pub fn reusing_device() {
 }
 ```
 
-An example of using a very big buffer :
+## Link to helpful doc for writing wgsl shaders
 
-```rust
-pub fn big_computations() {
-    let mut device = Device::new();
-    let size = 30_000_000;
-    device.create_buffer(
-        "buf",
-        BufferType::U32,
-        size,
-        BufferUsage::WriteOnly,
-        true);
-    let result = device.execute_shader_code(Dispatch::Linear(size), r"
-    fn number_of_seven_in_digit_product(number: u32) -> u32 {
-        var p: u32 = 1u;
-        var n: u32 = number;
-        loop {
-            if (n == 0u) {break;}
-            p = p * (n % 10u);
-            n = n / 10u;
-        }
-        var nb_seven: u32 = 0u;
-        loop {
-            if (p == 0u) {break;}
-            if (p % 10u == 7u) {
-                nb_seven = nb_seven + 1u;
-            }
-            p = p / 10u;
-        }
-        return nb_seven;
-    }
-    fn main() {
-        buf[index] = number_of_seven_in_digit_product(index);
-    }
-    ").into_iter().next().unwrap().unwrap_u32();
-    let mut max = &result[0];
-    let mut index = 0;
-    for (i, e) in result.iter().enumerate() {
-        if e > max {
-            max = e;
-            index = i;
-        }
-    }
-    println!("The number with the most sevens in the product of it's digits (below {size}) is {}", index);
-}
-```
+The helpful doc : [`wgsl`](https://www.w3.org/TR/WGSL)
+WARNING : the wgsl language described in this documentation is not exactly the one used by this crate :
+(the wgsl language used in this crate is the same as one used in the wgpu crate)
+-> The attributes in the doc are specified with `@attribute` while in this crate there are with `[[attribute]]`
+so `@group(0) @binding(0)` becomes `[[group(0), binding(0)]]`
+There are also some other minor differences but this doc is very useful for all the [`builtin functions`](https://www.w3.org/TR/WGSL/#builtin-functions)
