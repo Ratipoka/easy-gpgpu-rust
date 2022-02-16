@@ -173,14 +173,14 @@ pub fn multiple_returned_buffers() {
         }
     ").into_iter();
 
-    let sum = result.next().unwrap().unwrap_u32();
-    let product = result.next().unwrap().unwrap_u32();
+    let sum = result.next().unwrap().unwrap_u32(); // first returned buffer
+    let product = result.next().unwrap().unwrap_u32(); //second returned buffer
     println!("{:?}", sum);
     println!("{:?}", product);
 }
 ```
 
-An Example with a custom dispatch that gives access to the global_id variable.
+An example with a custom dispatch that gives access to the global_id variable.
 
 ```rust
 pub fn global_id() {
@@ -244,11 +244,17 @@ pub fn reusing_device() {
 }
 ```
 
+Even more examples are available in the docs, in the `examples` module
+
 ## Link to helpful doc for writing wgsl shaders
 
 The helpful doc : [`wgsl`](https://www.w3.org/TR/WGSL)
+
 WARNING : the wgsl language described in this documentation is not exactly the one used by this crate :
+
 (the wgsl language used in this crate is the same as one used in the wgpu crate)
+
 -> The attributes in the doc are specified with `@attribute` while in this crate there are with `[[attribute]]`
 so `@group(0) @binding(0)` becomes `[[group(0), binding(0)]]`
+
 There are also some other minor differences but this doc is very useful for all the [`builtin functions`](https://www.w3.org/TR/WGSL/#builtin-functions)
